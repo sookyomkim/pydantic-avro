@@ -3,14 +3,14 @@ import json
 import os
 import tempfile
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from pprint import pprint
 from typing import Dict, List, Optional, Union
 from uuid import UUID
 
 from avro import schema as avro_schema
 from fastavro import parse_schema, reader, writer
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from pydantic_avro.base import AvroBase
 
@@ -103,7 +103,7 @@ def test_avro():
             {"name": "c4", "type": {"type": "long", "logicalType": "timestamp-micros"}},
             {"name": "c5", "type": {"type": "int", "logicalType": "date"}},
             {"name": "c6", "type": {"type": "long", "logicalType": "time-micros"}},
-            {"name": "c7", "type": ["null", "string"], "default": None},
+            {"name": "c7", "type": ["null", "string"]},
             {"name": "c8", "type": "boolean"},
             {"name": "c9", "type": {"type": "string", "logicalType": "uuid"}, "doc": "This is UUID"},
             {
@@ -132,10 +132,10 @@ def test_avro_write():
         c1="1",
         c2=2,
         c3=3,
-        c4=4,
-        c5=5,
-        c6=6,
-        c7=7,
+        c4=datetime.now(timezone.utc),
+        c5=datetime.now(timezone.utc).date(),
+        c6=datetime.now(timezone.utc).time(),
+        c7="7",
         c8=True,
         c9=uuid.uuid4(),
         c10=uuid.uuid4(),
@@ -148,9 +148,7 @@ def test_avro_write():
     parsed_schema = parse_schema(TestModel.avro_schema())
 
     # 'records' can be an iterable (including generator)
-    records = [
-        record1.model_dump(),
-    ]
+    records = [record1.model_dump()]
 
     with tempfile.TemporaryDirectory() as dir:
         # Writing
@@ -161,7 +159,7 @@ def test_avro_write():
         # Reading
         with open(os.path.join(dir, "test.avro"), "rb") as fo:
             for record in reader(fo):
-                result_records.append(TestModel.model_validate(record))
+                result_records.append(TestModel.model_validate(record).model_dump())
     assert records == result_records
 
 
@@ -254,9 +252,7 @@ def test_avro_parse_list_of_lists():
     schema = ListofLists.avro_schema()
     parsed_schema = parse_schema(schema)
 
-    records = [
-        record.model_dump(),
-    ]
+    records = [record.model_dump()]
 
     with tempfile.TemporaryDirectory() as dir:
         # Writing
@@ -267,7 +263,7 @@ def test_avro_parse_list_of_lists():
         # Reading
         with open(os.path.join(dir, "test.avro"), "rb") as fo:
             for record in reader(fo):
-                result_records.append(ListofLists.model_validate(record))
+                result_records.append(ListofLists.model_validate(record).model_dump())
     assert records == result_records
 
 
@@ -276,16 +272,15 @@ def test_avro_write_complex():
         c1=["1", "2"],
         c2=NestedModel(c11=Nested2Model(c111="test")),
         c3=[NestedModel(c11=Nested2Model(c111="test"))],
-        c4=[1, 2, 3, 4],
+        c4=[datetime.now(timezone.utc), datetime.now(timezone.utc)],
         c5={"key": NestedModel(c11=Nested2Model(c111="test"))},
+        c6=None,
     )
 
     parsed_schema = parse_schema(ComplexTestModel.avro_schema())
 
     # 'records' can be an iterable (including generator)
-    records = [
-        record1.model_dump(),
-    ]
+    records = [record1.model_dump()]
 
     with tempfile.TemporaryDirectory() as dir:
         # Writing
@@ -296,7 +291,7 @@ def test_avro_write_complex():
         # Reading
         with open(os.path.join(dir, "test.avro"), "rb") as fo:
             for record in reader(fo):
-                result_records.append(ComplexTestModel.model_validate(record))
+                result_records.append(ComplexTestModel.model_validate(record).model_dump())
     assert records == result_records
 
 
@@ -308,8 +303,8 @@ def test_defaults():
         "name": "DefaultValues",
         "fields": [
             {"name": "c1", "type": "string", "default": "test"},
-            {"name": "c2", "type": ["null", "string"], "default": None},
-            {"name": "c3", "type": "string", "default": "test"},
+            {"name": "c2", "type": ["null", "string"]},
+            {"name": "c3", "type": ["null", "string"], "default": "test"},
             # pydantic .schema has no idea c3 can take None, so we do not allow it here either
         ],
     }
@@ -403,7 +398,7 @@ def test_union_avro():
 
 
 class OptionalArray(AvroBase):
-    c1: Optional[List[str]]
+    c1: Optional[List[str]] = None
 
 
 def test_optional_array():
@@ -413,7 +408,7 @@ def test_optional_array():
         "type": "record",
         "namespace": "OptionalArray",
         "name": "OptionalArray",
-        "fields": [{"type": ["null", {"type": "array", "items": {"type": "string"}}], "name": "c1", "default": None}],
+        "fields": [{"default": None, "type": ["null", {"type": "array", "items": {"type": "string"}}], "name": "c1"}],
     }
 
 
@@ -434,8 +429,7 @@ def test_int():
 class CustomNameModel(AvroBase):
     c1: int
 
-    class Config:
-        title = "some_other_name"
+    model_config = ConfigDict(title="some_other_name")
 
 
 def test_custom_name():

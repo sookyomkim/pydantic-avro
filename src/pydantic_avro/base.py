@@ -16,7 +16,7 @@ class AvroBase(BaseModel):
         :param namespace: Provide an optional namespace string to use in schema generation
         :return: dict with the Avro Schema for the model
         """
-        schema = cls.schema(by_alias=by_alias)
+        schema = cls.model_json_schema(by_alias=by_alias)
 
         if namespace is None:
             # default namespace will be based on title
@@ -33,7 +33,8 @@ class AvroBase(BaseModel):
         def get_definition(ref: str, schema: dict):
             """Reading definition of base schema for nested structs"""
             id = ref.replace("#/definitions/", "")
-            d = schema.get("definitions", {}).get(id)
+            id = id.replace("#/$defs/", "")
+            d = schema.get("definitions", {}).get(id) or schema.get("$defs", {}).get(id)
             if d is None:
                 raise RuntimeError(f"Definition {id} does not exist")
             return d
@@ -57,9 +58,14 @@ class AvroBase(BaseModel):
             if u is not None:
                 avro_type_dict["type"] = []
                 for union_element in u:
-                    avro_type_dict["type"].append(get_type(union_element)["type"])
+                    element_type = get_type(union_element)["type"]
+                    if element_type == "null":
+                        avro_type_dict["type"].insert(0, element_type)
+                    else:
+                        avro_type_dict["type"].append(element_type)
             elif r is not None:
                 class_name = r.replace("#/definitions/", "")
+                class_name = class_name.replace("#/$defs/", "")
                 if class_name in classes_seen:
                     avro_type_dict["type"] = class_name
                 else:
@@ -144,6 +150,8 @@ class AvroBase(BaseModel):
                 if isinstance(value_type, dict) and len(value_type) == 1:
                     value_type = value_type.get("type")
                 avro_type_dict["type"] = {"type": "map", "values": value_type}
+            elif t == "null":
+                avro_type_dict["type"] = "null"
             else:
                 raise NotImplementedError(
                     f"Type '{t}' not support yet, "
@@ -155,17 +163,9 @@ class AvroBase(BaseModel):
             """Return a list of fields of a struct"""
             fields = []
 
-            required = s.get("required", [])
             for key, value in s.get("properties", {}).items():
                 avro_type_dict = get_type(value)
                 avro_type_dict["name"] = key
-
-                if key not in required:
-                    if type(avro_type_dict["type"]) is list:
-                        avro_type_dict["type"].insert(0, "null")
-                    elif avro_type_dict.get("default") is None:
-                        avro_type_dict["type"] = ["null", avro_type_dict["type"]]
-                        avro_type_dict["default"] = None
 
                 fields.append(avro_type_dict)
             return fields
