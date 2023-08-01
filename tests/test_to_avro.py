@@ -149,7 +149,7 @@ def test_avro_write():
 
     # 'records' can be an iterable (including generator)
     records = [
-        record1.dict(),
+        record1.model_dump(),
     ]
 
     with tempfile.TemporaryDirectory() as dir:
@@ -161,7 +161,7 @@ def test_avro_write():
         # Reading
         with open(os.path.join(dir, "test.avro"), "rb") as fo:
             for record in reader(fo):
-                result_records.append(TestModel.parse_obj(record))
+                result_records.append(TestModel.model_validate(record))
     assert records == result_records
 
 
@@ -255,7 +255,7 @@ def test_avro_parse_list_of_lists():
     parsed_schema = parse_schema(schema)
 
     records = [
-        record.dict(),
+        record.model_dump(),
     ]
 
     with tempfile.TemporaryDirectory() as dir:
@@ -267,7 +267,7 @@ def test_avro_parse_list_of_lists():
         # Reading
         with open(os.path.join(dir, "test.avro"), "rb") as fo:
             for record in reader(fo):
-                result_records.append(ListofLists.parse_obj(record))
+                result_records.append(ListofLists.model_validate(record))
     assert records == result_records
 
 
@@ -284,7 +284,7 @@ def test_avro_write_complex():
 
     # 'records' can be an iterable (including generator)
     records = [
-        record1.dict(),
+        record1.model_dump(),
     ]
 
     with tempfile.TemporaryDirectory() as dir:
@@ -296,7 +296,7 @@ def test_avro_write_complex():
         # Reading
         with open(os.path.join(dir, "test.avro"), "rb") as fo:
             for record in reader(fo):
-                result_records.append(ComplexTestModel.parse_obj(record))
+                result_records.append(ComplexTestModel.model_validate(record))
     assert records == result_records
 
 
