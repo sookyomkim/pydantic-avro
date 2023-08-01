@@ -46,6 +46,7 @@ class AvroBase(BaseModel):
             r = value.get("$ref")
             a = value.get("additionalProperties")
             u = value.get("anyOf")
+            c = value.get("const")
             minimum = value.get("minimum")
             maximum = value.get("maximum")
             avro_type_dict: Dict[str, Any] = {}
@@ -152,6 +153,8 @@ class AvroBase(BaseModel):
                 avro_type_dict["type"] = {"type": "map", "values": value_type}
             elif t == "null":
                 avro_type_dict["type"] = "null"
+            elif c is not None:  # pydantic v2 Literal type: constant value(json) => avro(string)
+                avro_type_dict["type"] = "string"
             else:
                 raise NotImplementedError(
                     f"Type '{t}' not support yet, "

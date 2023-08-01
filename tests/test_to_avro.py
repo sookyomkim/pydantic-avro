@@ -5,7 +5,7 @@ import tempfile
 import uuid
 from datetime import date, datetime, time, timezone
 from pprint import pprint
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from avro import schema as avro_schema
@@ -459,4 +459,18 @@ def test_record_doc():
         "namespace": "ModelWithDocString",
         "name": "ModelWithDocString",
         "fields": [{"type": "long", "name": "c1"}],
+    }
+
+
+class ModelWithLiteral(AvroBase):
+    c1: Literal["this_string_only"] = "this_string_only"
+
+
+def test_record_literal():
+    result = ModelWithLiteral.avro_schema()
+    assert result == {
+        "type": "record",
+        "namespace": "ModelWithLiteral",
+        "name": "ModelWithLiteral",
+        "fields": [{"type": "string", "name": "c1", "default": "this_string_only"}],
     }
