@@ -8,7 +8,9 @@ class AvroBase(BaseModel):
     """This is base pydantic class that will add some methods"""
 
     @classmethod
-    def avro_schema(cls, by_alias: bool = True, namespace: Optional[str] = None) -> dict:
+    def avro_schema(
+        cls, by_alias: bool = True, namespace: Optional[str] = None, set_ns_to_class_def: bool = False
+    ) -> dict:
         """
         Return the avro schema for the pydantic class
 
@@ -22,10 +24,10 @@ class AvroBase(BaseModel):
             # default namespace will be based on title
             namespace = schema["title"]
 
-        return cls._avro_schema(schema, namespace)
+        return cls._avro_schema(schema, namespace, set_ns_to_class_def)
 
     @classmethod
-    def _avro_schema(cls, schema: dict, namespace: str) -> dict:
+    def _avro_schema(cls, schema: dict, namespace: str, set_ns_to_class_def: bool = False) -> dict:
         """Return the avro schema for the given pydantic schema"""
 
         classes_seen = set()
@@ -59,9 +61,13 @@ class AvroBase(BaseModel):
                 for union_element in u:
                     avro_type_dict["type"].append(get_type(union_element)["type"])
             elif r is not None:
+                namespace_of_class_name = f"{namespace}.{schema['title']}"
                 class_name = r.replace("#/definitions/", "")
                 if class_name in classes_seen:
-                    avro_type_dict["type"] = class_name
+                    if set_ns_to_class_def:
+                        avro_type_dict["type"] = f"{namespace_of_class_name}.{class_name}"
+                    else:
+                        avro_type_dict["type"] = class_name
                 else:
                     d = get_definition(r, schema)
                     if "enum" in d:
@@ -70,6 +76,8 @@ class AvroBase(BaseModel):
                             "symbols": [str(v) for v in d["enum"]],
                             "name": d["title"],
                         }
+                        if set_ns_to_class_def:
+                            avro_type_dict["type"]["namespace"] = namespace_of_class_name
                     else:
                         avro_type_dict["type"] = {
                             "type": "record",
@@ -78,6 +86,8 @@ class AvroBase(BaseModel):
                             # Because of this the path in the schema is tracked and used as name for a nested struct/array
                             "name": class_name,
                         }
+                        if set_ns_to_class_def:
+                            avro_type_dict["type"]["namespace"] = namespace_of_class_name
 
                     classes_seen.add(class_name)
             elif t == "array":
