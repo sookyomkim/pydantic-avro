@@ -1,3 +1,4 @@
+from datetime import datetime
 from inspect import cleandoc
 from typing import Any, Dict, List, Optional
 
@@ -117,6 +118,9 @@ class AvroBase(BaseModel):
                     "type": "long",
                     "logicalType": "timestamp-micros",
                 }
+                if "default" in value:
+                    dt = datetime.strptime(value.get("default", ""), "%Y-%m-%dT%H:%M:%S%z")
+                    avro_type_dict["default"] = int(dt.timestamp() * 1000000)  # microseconds
             elif t == "string" and f == "date":
                 avro_type_dict["type"] = {
                     "type": "int",
